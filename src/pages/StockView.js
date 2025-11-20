@@ -1,0 +1,357 @@
+import React, { useState, useEffect } from "react";
+import {
+  Card,
+  Input,
+  Tabs,
+  List,
+  Statistic,
+  Tag,
+  Spin,
+  message,
+  Grid,
+  Empty,
+} from "antd";
+import {
+  SearchOutlined,
+  AppstoreOutlined,
+  CheckCircleFilled,
+  ReloadOutlined,
+} from "@ant-design/icons";
+import "./Home.css";
+import { DB_SCHEMA } from "../config";
+
+const { useBreakpoint } = Grid;
+const { TabPane } = Tabs;
+
+const StockView = () => {
+  // ================= 공통 상태 =================
+  const screens = useBreakpoint();
+  // md(768px) 이상이면 태블릿/PC로 간주
+  const isTablet = !!screens.md;
+  const v_db = DB_SCHEMA;
+  const [activeTab, setActiveTab] = useState("2"); // 초기 탭을 '완제품'으로 설정
+
+  // ================= 데이터 상태 =================
+  const [stockData, setStockData] = useState([]);
+  const [filteredData, setFilteredData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [searchText, setSearchText] = useState("");
+
+  // ================= 데이터 조회 =================
+  const fetchStockData = (tabKey) => {
+    setLoading(true);
+
+    let url = `/api/stock/list?v_db=${v_db}`;
+    if (tabKey === "2") url += `&tab_gbn_cd=01`;
+    if (tabKey === "3") url += `&tab_gbn_cd=02`;
+
+    fetch(url)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.error) {
+          message.error("데이터 로드 실패");
+        } else {
+          setStockData(data);
+          setFilteredData(data);
+          if (searchText) applySearch(searchText, data);
+        }
+      })
+      .catch(() => message.error("서버 통신 오류"))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    setSearchText("");
+    fetchStockData(activeTab);
+  }, [v_db, activeTab]);
+
+  // ================= 검색 및 핸들러 =================
+  const applySearch = (text, sourceData) => {
+    const lowerValue = text.toLowerCase();
+    const filtered = sourceData.filter(
+      (item) =>
+        item.jepum_cd.toLowerCase().includes(lowerValue) ||
+        item.jepum_nm.toLowerCase().includes(lowerValue)
+    );
+    setFilteredData(filtered);
+  };
+
+  const handleSearch = (e) => {
+    const value = e.target.value;
+    setSearchText(value);
+    applySearch(value, stockData);
+  };
+
+  const handleRefresh = () => {
+    fetchStockData(activeTab);
+    message.success("새로고침 되었습니다.");
+  };
+
+  // ================= 렌더링 헬퍼 =================
+
+  // 🖥️ PC 아이템 (기존 유지: 카드 형태)
+  const renderPCItem = (item, color) => (
+    <div
+      style={{
+        backgroundColor: "#fff",
+        border: "1px solid #d9d9d9",
+        borderTop: `4px solid ${color}`,
+        borderRadius: "8px",
+        padding: "15px",
+        height: "100%",
+        position: "relative",
+        transition: "all 0.2s",
+        boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+      }}
+    >
+      <div>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "start",
+            marginBottom: "10px",
+          }}
+        >
+          <Tag color="blue" style={{ margin: 0 }}>
+            {item.jepum_cd}
+          </Tag>
+          {item.stock_tot > 0 && (
+            <CheckCircleFilled style={{ color: "#52c41a" }} />
+          )}
+        </div>
+        <div
+          style={{
+            fontWeight: "bold",
+            fontSize: "16px",
+            marginBottom: "15px",
+            lineHeight: "1.3",
+            wordBreak: "keep-all",
+            height: "42px",
+            overflow: "hidden",
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+            color: "#333",
+          }}
+        >
+          {item.jepum_nm}
+        </div>
+      </div>
+
+      <div
+        style={{
+          textAlign: "right",
+          borderTop: "1px dashed #f0f0f0",
+          paddingTop: "10px",
+        }}
+      >
+        <Statistic
+          value={item.stock_tot}
+          precision={0}
+          valueStyle={{ color: color, fontWeight: "bold", fontSize: "22px" }}
+          suffix={<span style={{ fontSize: "14px", color: "#888" }}>EA</span>}
+        />
+      </div>
+    </div>
+  );
+
+  // 📱 모바일 전용 테이블 렌더러 (NEW: HTML Table 사용)
+  // div 대신 table 태그를 사용하여 정렬이 틀어질 수 없도록 강제합니다.
+  const renderMobileTable = () => (
+    <table
+      style={{
+        width: "100%",
+        borderCollapse: "collapse",
+        backgroundColor: "#fff",
+        borderRadius: "8px",
+        overflow: "hidden", // 모서리 둥글게 처리
+        boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+      }}
+    >
+      {/* 테이블 헤더 */}
+      <thead>
+        <tr
+          style={{
+            backgroundColor: "#fafafa",
+            borderBottom: "2px solid #e8e8e8",
+            fontSize: "13px",
+            color: "#666",
+          }}
+        >
+          <th
+            style={{
+              padding: "12px 10px",
+              textAlign: "left",
+              fontWeight: "bold",
+            }}
+          >
+            제품정보
+          </th>
+          <th
+            style={{
+              padding: "12px 10px",
+              textAlign: "right",
+              fontWeight: "bold",
+              width: "90px", // 우측 열 너비 고정
+              whiteSpace: "nowrap",
+            }}
+          >
+            현재고
+          </th>
+        </tr>
+      </thead>
+
+      {/* 테이블 바디 */}
+      <tbody>
+        {filteredData.map((item) => {
+          const hasStock = item.stock_tot > 0;
+          const color = hasStock ? "#3f8600" : "#cf1322";
+
+          return (
+            <tr
+              key={item.jepum_cd}
+              style={{
+                borderBottom: "1px solid #f0f0f0",
+              }}
+            >
+              {/* 좌측 셀: 제품 정보 */}
+              <td style={{ padding: "20px 10px", verticalAlign: "middle" }}>
+                <div
+                  style={{
+                    fontWeight: "bold",
+                    fontSize: "16px",
+                    marginBottom: "6px",
+                    color: "#333",
+                    wordBreak: "keep-all",
+                  }}
+                >
+                  {item.jepum_nm}
+                </div>
+                <div style={{ fontSize: "13px", color: "#999" }}>
+                  <Tag style={{ marginRight: 0 }}>{item.jepum_cd}</Tag>
+                </div>
+              </td>
+
+              {/* 우측 셀: 재고 수량 */}
+              <td
+                style={{
+                  padding: "20px 10px",
+                  textAlign: "right",
+                  verticalAlign: "middle",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "18px",
+                    fontWeight: "bold",
+                    color: color,
+                  }}
+                >
+                  {item.stock_tot.toLocaleString()}
+                </div>
+                <div style={{ fontSize: "12px", color: "#888" }}>EA</div>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+
+  // ================= 메인 렌더링 =================
+  return (
+    <div
+      className="home-container"
+      style={{ padding: "10px", maxWidth: "1200px", margin: "0 auto" }}
+    >
+      <Card
+        title={
+          <span style={{ fontWeight: "bold" }}>
+            <AppstoreOutlined /> 재고 조회
+          </span>
+        }
+        bordered={true}
+        style={{ borderRadius: "10px" }}
+        extra={
+          <ReloadOutlined
+            onClick={handleRefresh}
+            style={{ fontSize: "18px", cursor: "pointer" }}
+          />
+        }
+      >
+        <Tabs activeKey={activeTab} onChange={setActiveTab} type="card">
+          <TabPane tab="전체" key="1" />
+          <TabPane tab="완제품" key="2" />
+          <TabPane tab="부자재" key="3" />
+        </Tabs>
+
+        <div style={{ marginTop: "10px" }}>
+          <Input
+            placeholder="제품코드 또는 제품명 검색..."
+            prefix={<SearchOutlined />}
+            size="large"
+            value={searchText}
+            onChange={handleSearch}
+            style={{ marginBottom: "20px" }}
+            allowClear
+          />
+
+          {loading ? (
+            <div style={{ textAlign: "center", padding: "50px" }}>
+              <Spin size="large" tip="데이터 불러오는 중..." />
+            </div>
+          ) : (
+            <>
+              {filteredData.length === 0 ? (
+                <Empty
+                  description="데이터가 없습니다."
+                  style={{ padding: "50px" }}
+                />
+              ) : (
+                <div
+                  style={{
+                    // PC일때는 테두리 없음(리스트 아이템이 카드라), 모바일은 테이블 자체 스타일 사용
+                    border: "none",
+                  }}
+                >
+                  {/* 모바일이면 HTML Table을, PC면 기존 Antd List를 렌더링 */}
+                  {!isTablet ? (
+                    renderMobileTable()
+                  ) : (
+                    <List
+                      grid={{
+                        gutter: 16,
+                        xs: 1,
+                        sm: 2,
+                        md: 3,
+                        lg: 4,
+                        xl: 4,
+                        xxl: 5,
+                      }}
+                      dataSource={filteredData}
+                      renderItem={(item) => {
+                        const hasStock = item.stock_tot > 0;
+                        const color = hasStock ? "#3f8600" : "#cf1322";
+                        return (
+                          <List.Item style={{ marginBottom: 16 }}>
+                            {renderPCItem(item, color)}
+                          </List.Item>
+                        );
+                      }}
+                    />
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </Card>
+    </div>
+  );
+};
+
+export default StockView;

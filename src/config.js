@@ -1,0 +1,1 @@
+export const DB_SCHEMA = '97_GM';

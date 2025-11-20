@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "http://agen072.iptime.org:8999/api/$1"
+    }
+  ]
+}
