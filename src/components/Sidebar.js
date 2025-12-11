@@ -22,8 +22,8 @@ const Sidebar = ({ toggleCollapsed }) => {
     {
       key: "2",
       icon: <EditOutlined />,
-      label: "주문등록",
-      onClick: () => handleMenuClick("/SujuRegister"),
+      label: "출하등록",
+      onClick: () => handleMenuClick("/ChulhaRegister"),
     },
     {
       key: "3",

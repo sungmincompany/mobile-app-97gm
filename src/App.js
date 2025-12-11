@@ -9,7 +9,7 @@ import {
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
 import SegsanRegister from "./pages/SegsanRegister";
-import SujuRegister from "./pages/SujuRegister";
+import ChulhaRegister from "./pages/ChulhaRegister";
 import StockView from "./pages/StockView";
 import { Layout } from "antd";
 import "antd/dist/reset.css";
@@ -62,7 +62,7 @@ const App = () => {
               />{" "}
               {/* 기본 경로 설정 */}
               <Route path="/SegsanRegister" element={<SegsanRegister />} />
-              <Route path="/SujuRegister" element={<SujuRegister />} />
+              <Route path="/ChulhaRegister" element={<ChulhaRegister />} />
               <Route path="/StockView" element={<StockView />} />
             </Routes>
           </Content>
