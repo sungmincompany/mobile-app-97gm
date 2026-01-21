@@ -63,7 +63,10 @@ const SegsanRegister = () => {
 
   // 1. 초기 데이터 로드
   useEffect(() => {
-    fetch(`/api/common/jepum?v_db=${v_db}&tab_gbn_cd=01`)
+    fetch(
+      //`/api/common/jepum?v_db=${v_db}&tab_gbn_cd=01&jepum_flg2=02&sort_type=cd`,
+      `/api/97gm/jepum/line?v_db=${v_db}`,
+    )
       .then((res) => res.json())
       .then((data) => {
         setProductList(data);
@@ -100,7 +103,7 @@ const SegsanRegister = () => {
     const filtered = productList.filter(
       (p) =>
         p.jepum_nm.toLowerCase().includes(keywordLower) ||
-        p.jepum_cd.toLowerCase().includes(keywordLower)
+        p.jepum_cd.toLowerCase().includes(keywordLower),
     );
     setFilteredProducts(filtered);
   };
@@ -197,7 +200,7 @@ const SegsanRegister = () => {
         try {
           const res = await fetch(
             `/api/segsan/delete?v_db=${v_db}&segsan_cd=${record.segsan_cd}`,
-            { method: "DELETE" }
+            { method: "DELETE" },
           );
           if (res.ok) {
             message.success("삭제되었습니다.");

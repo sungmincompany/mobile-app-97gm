@@ -76,8 +76,11 @@ const ChulhaRegister = () => {
 
   // ================= 초기 데이터 로드 =================
   useEffect(() => {
-    // 1. 제품 목록 조회
-    fetch(`/api/common/jepum?v_db=${v_db}&tab_gbn_cd=01`)
+    // 1. 제품 목록 조회, tab_gbn_cd=01 (완제품)
+    fetch(
+      //`/api/common/jepum?v_db=${v_db}&tab_gbn_cd=01&jepum_flg2=02&sort_type=cd`,
+      `/api/97gm/jepum/line?v_db=${v_db}`,
+    )
       .then((res) => res.json())
       .then((data) => {
         setProductList(data);
@@ -85,7 +88,7 @@ const ChulhaRegister = () => {
       })
       .catch((err) => console.error("제품 로드 실패:", err));
 
-    // 2. 거래처(Vender) 목록 조회
+    // 2. 거래처(Vender) 목록 조회, tab_gbn_cd=01 (판매처)
     fetch(`/api/common/vender?v_db=${v_db}&tab_gbn_cd=01`)
       .then((res) => res.json())
       .then((data) => {
