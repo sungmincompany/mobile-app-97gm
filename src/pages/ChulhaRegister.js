@@ -27,6 +27,8 @@ import {
   DeleteOutlined,
   UserOutlined,
   ShopOutlined,
+  LeftOutlined, // 👈 추가
+  RightOutlined, // 👈 추가
 } from "@ant-design/icons";
 import { DB_SCHEMA } from "../config";
 
@@ -107,6 +109,22 @@ const ChulhaRegister = () => {
       fetchHistory();
     }
   }, [activeTab, searchRange]);
+
+  // 날짜 하루 전으로 이동
+  const handlePrevDate = () => {
+    const current = form.getFieldValue("chulha_dt");
+    if (current) {
+      form.setFieldsValue({ chulha_dt: current.subtract(1, "day") });
+    }
+  };
+
+  // 날짜 하루 후로 이동
+  const handleNextDate = () => {
+    const current = form.getFieldValue("chulha_dt");
+    if (current) {
+      form.setFieldsValue({ chulha_dt: current.add(1, "day") });
+    }
+  };
 
   // ================= 기능 함수들 =================
 
@@ -419,17 +437,42 @@ const ChulhaRegister = () => {
               onFinish={onFinish}
               initialValues={{ chulha_dt: dayjs(), amt: 1 }}
             >
+              {/* 날짜 선택 영역 수정 */}
               <Form.Item
                 label="📅 출하일자"
-                name="chulha_dt"
-                rules={[{ required: true, message: "날짜를 선택하세요" }]}
+                required
                 style={{ marginBottom: "15px" }}
               >
-                <DatePicker
-                  style={{ width: "100%" }}
-                  format="YYYY-MM-DD"
-                  size="large"
-                />
+                <div style={{ display: "flex", gap: "5px" }}>
+                  {/* 이전 날짜 버튼 */}
+                  <Button
+                    icon={<LeftOutlined />}
+                    onClick={handlePrevDate}
+                    size="large"
+                  />
+
+                  {/* DatePicker (noStyle로 감싸서 레이아웃 영향 최소화) */}
+                  <Form.Item
+                    name="chulha_dt"
+                    noStyle
+                    rules={[{ required: true, message: "날짜를 선택하세요" }]}
+                  >
+                    <DatePicker
+                      style={{ flex: 1 }} // 남은 공간 꽉 채우기
+                      format="YYYY-MM-DD"
+                      size="large"
+                      inputReadOnly={true} // 모바일 키보드 방지
+                      allowClear={false}
+                    />
+                  </Form.Item>
+
+                  {/* 다음 날짜 버튼 */}
+                  <Button
+                    icon={<RightOutlined />}
+                    onClick={handleNextDate}
+                    size="large"
+                  />
+                </div>
               </Form.Item>
 
               <div style={{ marginBottom: "15px" }}>
