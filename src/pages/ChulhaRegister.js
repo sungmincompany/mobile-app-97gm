@@ -72,10 +72,7 @@ const ChulhaRegister = () => {
 
   // ================= 탭 2: 조회용 상태 =================
   const [historyList, setHistoryList] = useState([]);
-  const [searchRange, setSearchRange] = useState([
-    dayjs().startOf("month"),
-    dayjs().endOf("month"),
-  ]);
+  const [searchRange, setSearchRange] = useState([dayjs(), dayjs()]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editRecord, setEditRecord] = useState(null);
@@ -124,6 +121,20 @@ const ChulhaRegister = () => {
     if (current) {
       form.setFieldsValue({ chulha_dt: current.add(1, "day") });
     }
+  };
+
+  // 검색 기간 프리셋 설정 (오늘, 1주일, 1개월)
+  const setRangeToday = () => {
+    setSearchRange([dayjs(), dayjs()]);
+    // 필요 시 바로 조회하려면 fetchHistory() 호출 추가 가능
+  };
+
+  const setRangeWeek = () => {
+    setSearchRange([dayjs().subtract(1, "week"), dayjs()]);
+  };
+
+  const setRangeMonth = () => {
+    setSearchRange([dayjs().subtract(1, "month"), dayjs()]);
   };
 
   // ================= 기능 함수들 =================
@@ -988,13 +999,14 @@ const ChulhaRegister = () => {
             </Form>
           </Tabs.TabPane>
 
-          {/* ================= 탭 2: 조회 및 수정 (변동 없음) ================= */}
+          {/* ================= 탭 2: 조회 및 수정 ================= */}
           <Tabs.TabPane tab="조회/수정" key="2">
             <div
               style={{
                 marginBottom: 16,
                 display: "flex",
                 justifyContent: "center",
+                alignItems: "center", // 세로 중앙 정렬 추가
                 gap: "10px",
                 backgroundColor: "#f9f9f9",
                 padding: "15px",
@@ -1002,6 +1014,14 @@ const ChulhaRegister = () => {
                 flexWrap: "wrap",
               }}
             >
+              {/* 기간 단축 버튼 그룹 추가 */}
+              <Button.Group>
+                <Button onClick={setRangeToday}>오늘</Button>
+                <Button onClick={setRangeWeek}>1주일</Button>
+                <Button onClick={setRangeMonth}>1개월</Button>
+              </Button.Group>
+
+              {/* 기존 RangePicker */}
               <RangePicker
                 value={searchRange}
                 onChange={(dates) => setSearchRange(dates)}
@@ -1009,6 +1029,8 @@ const ChulhaRegister = () => {
                 format="YYYY-MM-DD"
                 style={{ width: isTablet ? "auto" : "100%" }}
               />
+
+              {/* 기존 조회 버튼 */}
               <Button
                 type="primary"
                 icon={<ReloadOutlined />}
@@ -1022,7 +1044,7 @@ const ChulhaRegister = () => {
               dataSource={historyList}
               columns={columns}
               rowKey="chulha_cd"
-              pagination={{ pageSize: 5 }}
+              pagination={{ position: ["bottomCenter"], pageSize: 10 }}
               scroll={{ x: 500, y: "calc(100vh - 420px)" }}
               size="middle"
             />

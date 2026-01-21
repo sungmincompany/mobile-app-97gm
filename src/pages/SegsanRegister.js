@@ -58,8 +58,10 @@ const SegsanRegister = () => {
 
   // 조회 기간 상태
   const [searchRange, setSearchRange] = useState([
-    dayjs().startOf("month"),
-    dayjs().endOf("month"),
+    //dayjs().startOf("month"),
+    //dayjs().endOf("month"),
+    dayjs(),
+    dayjs(),
   ]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -156,6 +158,20 @@ const SegsanRegister = () => {
     if (current) {
       form.setFieldsValue({ segsan_dt: current.add(1, "day") });
     }
+  };
+
+  // 검색 기간 프리셋 설정 (오늘, 1주일, 1개월)
+  const setRangeToday = () => {
+    setSearchRange([dayjs(), dayjs()]);
+    // 필요 시 바로 조회하려면 fetchHistory() 호출 추가 가능
+  };
+
+  const setRangeWeek = () => {
+    setSearchRange([dayjs().subtract(1, "week"), dayjs()]);
+  };
+
+  const setRangeMonth = () => {
+    setSearchRange([dayjs().subtract(1, "month"), dayjs()]);
   };
 
   const onFinish = async (values) => {
@@ -703,41 +719,38 @@ const SegsanRegister = () => {
             </Form>
           </Tabs.TabPane>
 
-          {/* 탭 2: 생산 조회 및 관리 */}
+          {/* ================= 탭 2: 조회 및 수정 ================= */}
           <Tabs.TabPane tab="조회/수정" key="2">
-            <style>
-              {`
-                .centered-range-picker .ant-picker-input > input {
-                  text-align: center;
-                }
-              `}
-            </style>
-
             <div
               style={{
                 marginBottom: 16,
                 display: "flex",
-                alignItems: "center",
                 justifyContent: "center",
+                alignItems: "center", // 세로 중앙 정렬 추가
                 gap: "10px",
-                flexWrap: "wrap",
                 backgroundColor: "#f9f9f9",
                 padding: "15px",
                 borderRadius: "8px",
+                flexWrap: "wrap",
               }}
             >
-              <span style={{ fontWeight: "bold" }}>조회기간:</span>
+              {/* 기간 단축 버튼 그룹 추가 */}
+              <Button.Group>
+                <Button onClick={setRangeToday}>오늘</Button>
+                <Button onClick={setRangeWeek}>1주일</Button>
+                <Button onClick={setRangeMonth}>1개월</Button>
+              </Button.Group>
+
+              {/* 기존 RangePicker */}
               <RangePicker
-                className="centered-range-picker"
                 value={searchRange}
                 onChange={(dates) => setSearchRange(dates)}
                 allowClear={false}
                 format="YYYY-MM-DD"
-                style={{
-                  width: isTablet ? "auto" : "100%",
-                  minWidth: "220px",
-                }}
+                style={{ width: isTablet ? "auto" : "100%" }}
               />
+
+              {/* 기존 조회 버튼 */}
               <Button
                 type="primary"
                 icon={<ReloadOutlined />}
@@ -751,12 +764,7 @@ const SegsanRegister = () => {
               dataSource={historyList}
               columns={columns}
               rowKey="segsan_cd"
-              pagination={{
-                position: ["bottomCenter"],
-                showSizeChanger: true,
-                pageSizeOptions: ["5", "10", "20", "50", "100"],
-                defaultPageSize: 5,
-              }}
+              pagination={{ position: ["bottomCenter"], pageSize: 10 }}
               scroll={{
                 x: 400,
                 y: "calc(100vh - 420px)",
