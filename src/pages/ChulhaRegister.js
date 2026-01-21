@@ -13,7 +13,7 @@ import {
   Table,
   Modal,
   Tag,
-  Select, // 드롭다운용 컴포넌트
+  Select,
 } from "antd";
 import dayjs from "dayjs";
 import {
@@ -52,12 +52,18 @@ const ChulhaRegister = () => {
   const [selectedProductName, setSelectedProductName] = useState("");
   const [productSearchTerm, setProductSearchTerm] = useState("");
 
+  // ✅ [추가] 모바일 제품 선택 모달 상태
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+
   // 2. 거래처(Vender) 관련 상태
   const [venderList, setVenderList] = useState([]);
   const [filteredVenders, setFilteredVenders] = useState([]);
   const [selectedVender, setSelectedVender] = useState(null);
   const [selectedVenderName, setSelectedVenderName] = useState("");
   const [venderSearchTerm, setVenderSearchTerm] = useState("");
+
+  // ✅ [추가] 모바일 거래처 선택 모달 상태
+  const [isVenderModalOpen, setIsVenderModalOpen] = useState(false);
 
   // 3. 수량 및 기타 상태
   const [quantity, setQuantity] = useState(1);
@@ -76,11 +82,8 @@ const ChulhaRegister = () => {
 
   // ================= 초기 데이터 로드 =================
   useEffect(() => {
-    // 1. 제품 목록 조회, tab_gbn_cd=01 (완제품)
-    fetch(
-      //`/api/common/jepum?v_db=${v_db}&tab_gbn_cd=01&jepum_flg2=02&sort_type=cd`,
-      `/api/97gm/jepum/line?v_db=${v_db}`,
-    )
+    // 1. 제품 목록 조회
+    fetch(`/api/97gm/jepum/line?v_db=${v_db}`)
       .then((res) => res.json())
       .then((data) => {
         setProductList(data);
@@ -88,7 +91,7 @@ const ChulhaRegister = () => {
       })
       .catch((err) => console.error("제품 로드 실패:", err));
 
-    // 2. 거래처(Vender) 목록 조회, tab_gbn_cd=01 (판매처)
+    // 2. 거래처(Vender) 목록 조회
     fetch(`/api/common/vender?v_db=${v_db}&tab_gbn_cd=01`)
       .then((res) => res.json())
       .then((data) => {
@@ -119,7 +122,7 @@ const ChulhaRegister = () => {
       .catch((err) => message.error("조회 실패"));
   };
 
-  // --- [태블릿용] 제품 검색 및 선택 (카드 UI) ---
+  // --- [공통] 제품 검색 및 선택 (모달/카드 공용) ---
   const handleProductSearch = (e) => {
     const keyword = e.target.value;
     setProductSearchTerm(keyword);
@@ -138,7 +141,7 @@ const ChulhaRegister = () => {
     form.setFieldsValue({ jepum_cd: p.jepum_cd });
   };
 
-  // --- [태블릿용] 거래처 검색 및 선택 (카드 UI) ---
+  // --- [공통] 거래처 검색 및 선택 (모달/카드 공용) ---
   const handleVenderSearch = (e) => {
     const keyword = e.target.value;
     setVenderSearchTerm(keyword);
@@ -155,18 +158,6 @@ const ChulhaRegister = () => {
     setSelectedVender(v.vender_cd);
     setSelectedVenderName(v.vender_nm);
     form.setFieldsValue({ vender_cd: v.vender_cd });
-  };
-
-  // --- [모바일용] 드롭다운 선택 핸들러 ---
-  const handleProductSelectDropdown = (value, option) => {
-    setSelectedProduct(value);
-    setSelectedProductName(option.children); // 드롭다운 텍스트(이름) 저장
-    // Form value는 Select가 자동으로 처리하지만 명시적으로 지정 가능
-  };
-
-  const handleVenderSelectDropdown = (value, option) => {
-    setSelectedVender(value);
-    setSelectedVenderName(option.children);
   };
 
   // --- 수량 조절 ---
@@ -452,12 +443,9 @@ const ChulhaRegister = () => {
                   📦 제품 및 거래처 선택
                 </div>
 
-                {/* [중요] 모바일 vs 태블릿 분기 처리
-                  - isTablet (true): 기존의 카드 형태 그리드 UI 표시
-                  - !isTablet (false): 모바일용 드롭다운 UI 표시
-                */}
+                {/* [중요] 모바일 vs 태블릿 분기 처리 */}
                 {!isTablet ? (
-                  // === 모바일용 드롭다운 UI ===
+                  // === [모바일 View] 모달 방식 ===
                   <div
                     style={{
                       display: "flex",
@@ -465,62 +453,192 @@ const ChulhaRegister = () => {
                       gap: "15px",
                     }}
                   >
+                    {/* 1. 제품 선택 Input (Modal Trigger) */}
                     <Form.Item
                       label="📦 제품 선택"
-                      name="jepum_cd"
+                      required
+                      tooltip="클릭하여 제품을 선택하세요"
                       style={{ marginBottom: 0 }}
-                      rules={[{ required: true, message: "제품을 선택하세요" }]}
                     >
-                      <Select
-                        showSearch
+                      <Input
+                        readOnly
                         size="large"
-                        placeholder="제품 검색 및 선택"
-                        optionFilterProp="children"
-                        onChange={handleProductSelectDropdown}
-                        filterOption={(input, option) =>
-                          (option?.children ?? "")
-                            .toLowerCase()
-                            .includes(input.toLowerCase())
-                        }
-                      >
-                        {productList.map((p) => (
-                          <Option key={p.jepum_cd} value={p.jepum_cd}>
-                            {p.jepum_nm}
-                          </Option>
-                        ))}
-                      </Select>
+                        value={selectedProductName}
+                        placeholder="제품을 선택해 주세요"
+                        onClick={() => setIsProductModalOpen(true)}
+                        suffix={<SearchOutlined />}
+                      />
                     </Form.Item>
-
+                    {/* 실제 Form 전송용 히든 필드 */}
                     <Form.Item
-                      label="🏢 거래처 선택"
-                      name="vender_cd"
-                      style={{ marginBottom: 0 }}
+                      name="jepum_cd"
+                      style={{ display: "none" }}
                       rules={[
-                        { required: true, message: "거래처를 선택하세요" },
+                        { required: true, message: "제품을 선택해주세요" },
                       ]}
                     >
-                      <Select
-                        showSearch
-                        size="large"
-                        placeholder="거래처 검색 및 선택"
-                        optionFilterProp="children"
-                        onChange={handleVenderSelectDropdown}
-                        filterOption={(input, option) =>
-                          (option?.children ?? "")
-                            .toLowerCase()
-                            .includes(input.toLowerCase())
-                        }
-                      >
-                        {venderList.map((v) => (
-                          <Option key={v.vender_cd} value={v.vender_cd}>
-                            {v.vender_nm}
-                          </Option>
-                        ))}
-                      </Select>
+                      <Input />
                     </Form.Item>
+
+                    {/* 2. 거래처 선택 Input (Modal Trigger) */}
+                    <Form.Item
+                      label="🏢 거래처 선택"
+                      required
+                      tooltip="클릭하여 거래처를 선택하세요"
+                      style={{ marginBottom: 0 }}
+                    >
+                      <Input
+                        readOnly
+                        size="large"
+                        value={selectedVenderName}
+                        placeholder="거래처를 선택해 주세요"
+                        onClick={() => setIsVenderModalOpen(true)}
+                        suffix={<SearchOutlined />}
+                      />
+                    </Form.Item>
+                    {/* 실제 Form 전송용 히든 필드 */}
+                    <Form.Item
+                      name="vender_cd"
+                      style={{ display: "none" }}
+                      rules={[
+                        { required: true, message: "거래처를 선택해주세요" },
+                      ]}
+                    >
+                      <Input />
+                    </Form.Item>
+
+                    {/* --- 제품 선택 모달 --- */}
+                    <Modal
+                      title="제품 선택"
+                      open={isProductModalOpen}
+                      onCancel={() => setIsProductModalOpen(false)}
+                      footer={null}
+                      bodyStyle={{ padding: "0" }}
+                      centered
+                      style={{ top: 20 }}
+                    >
+                      <div
+                        style={{
+                          padding: "15px",
+                          borderBottom: "1px solid #f0f0f0",
+                        }}
+                      >
+                        <Input
+                          placeholder="제품명 또는 코드 검색"
+                          prefix={<SearchOutlined />}
+                          size="large"
+                          value={productSearchTerm}
+                          onChange={handleProductSearch}
+                        />
+                      </div>
+                      <div style={{ height: "60vh", overflowY: "auto" }}>
+                        {filteredProducts.length > 0 ? (
+                          filteredProducts.map((p) => (
+                            <div
+                              key={p.jepum_cd}
+                              onClick={() => {
+                                handleProductSelectCard(p);
+                                setIsProductModalOpen(false);
+                              }}
+                              style={{
+                                padding: "15px 20px",
+                                borderBottom: "1px solid #f0f0f0",
+                                cursor: "pointer",
+                                backgroundColor:
+                                  selectedProduct === p.jepum_cd
+                                    ? "#e6f7ff"
+                                    : "#fff",
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                              }}
+                            >
+                              <span
+                                style={{ fontSize: "15px", fontWeight: "bold" }}
+                              >
+                                {p.jepum_nm}
+                              </span>
+                              <span style={{ fontSize: "12px", color: "#888" }}>
+                                {p.jepum_cd}
+                              </span>
+                            </div>
+                          ))
+                        ) : (
+                          <Empty
+                            description="검색 결과 없음"
+                            style={{ padding: "40px 0" }}
+                          />
+                        )}
+                      </div>
+                    </Modal>
+
+                    {/* --- 거래처 선택 모달 --- */}
+                    <Modal
+                      title="거래처 선택"
+                      open={isVenderModalOpen}
+                      onCancel={() => setIsVenderModalOpen(false)}
+                      footer={null}
+                      bodyStyle={{ padding: "0" }}
+                      centered
+                      style={{ top: 20 }}
+                    >
+                      <div
+                        style={{
+                          padding: "15px",
+                          borderBottom: "1px solid #f0f0f0",
+                        }}
+                      >
+                        <Input
+                          placeholder="거래처명 또는 코드 검색"
+                          prefix={<SearchOutlined />}
+                          size="large"
+                          value={venderSearchTerm}
+                          onChange={handleVenderSearch}
+                        />
+                      </div>
+                      <div style={{ height: "60vh", overflowY: "auto" }}>
+                        {filteredVenders.length > 0 ? (
+                          filteredVenders.map((v) => (
+                            <div
+                              key={v.vender_cd}
+                              onClick={() => {
+                                handleVenderSelectCard(v);
+                                setIsVenderModalOpen(false);
+                              }}
+                              style={{
+                                padding: "15px 20px",
+                                borderBottom: "1px solid #f0f0f0",
+                                cursor: "pointer",
+                                backgroundColor:
+                                  selectedVender === v.vender_cd
+                                    ? "#f6ffed"
+                                    : "#fff",
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                              }}
+                            >
+                              <span
+                                style={{ fontSize: "15px", fontWeight: "bold" }}
+                              >
+                                {v.vender_nm}
+                              </span>
+                              <span style={{ fontSize: "12px", color: "#888" }}>
+                                {v.vender_cd}
+                              </span>
+                            </div>
+                          ))
+                        ) : (
+                          <Empty
+                            description="검색 결과 없음"
+                            style={{ padding: "40px 0" }}
+                          />
+                        )}
+                      </div>
+                    </Modal>
                   </div>
                 ) : (
-                  // === 태블릿/PC용 카드 그리드 UI (기존 유지) ===
+                  // === [태블릿/PC View] 카드 그리드 UI (기존 코드 유지) ===
                   <div style={selectionContainerStyle}>
                     {/* (좌측) 제품 선택 */}
                     <div style={productSectionStyle}>

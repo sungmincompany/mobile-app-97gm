@@ -48,6 +48,9 @@ const SegsanRegister = () => {
   const [selectedProductName, setSelectedProductName] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
 
+  // ✅ [추가] 모바일 제품 선택 모달 상태
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+
   // ================= 탭 2: 조회용 상태 =================
   const [historyList, setHistoryList] = useState([]);
 
@@ -63,10 +66,7 @@ const SegsanRegister = () => {
 
   // 1. 초기 데이터 로드
   useEffect(() => {
-    fetch(
-      //`/api/common/jepum?v_db=${v_db}&tab_gbn_cd=01&jepum_flg2=02&sort_type=cd`,
-      `/api/97gm/jepum/line?v_db=${v_db}`,
-    )
+    fetch(`/api/97gm/jepum/line?v_db=${v_db}`)
       .then((res) => res.json())
       .then((data) => {
         setProductList(data);
@@ -112,13 +112,6 @@ const SegsanRegister = () => {
     setSelectedProduct(p.jepum_cd);
     setSelectedProductName(p.jepum_nm);
     form.setFieldsValue({ jepum_cd: p.jepum_cd });
-  };
-
-  const handleProductSelectDropdown = (val) => {
-    const p = productList.find((item) => item.jepum_cd === val);
-    setSelectedProduct(val);
-    if (p) setSelectedProductName(p.jepum_nm);
-    form.setFieldsValue({ jepum_cd: val });
   };
 
   const handlePlus = () => {
@@ -179,12 +172,10 @@ const SegsanRegister = () => {
 
   // ================= 탭 2 기능 (수정/삭제) =================
 
-  // ✅ [추가] 수정 모달용 수량 증가 함수
   const handleEditPlus = () => {
     setEditAmt((prev) => (prev || 0) + 1);
   };
 
-  // ✅ [추가] 수정 모달용 수량 감소 함수
   const handleEditMinus = () => {
     setEditAmt((prev) => (prev > 1 ? prev - 1 : prev));
   };
@@ -334,12 +325,13 @@ const SegsanRegister = () => {
                 </div>
 
                 <div style={{ gridArea: "product" }}>
-                  <Form.Item
-                    label="📦 제품선택"
-                    name="jepum_cd"
-                    rules={[{ required: true }]}
-                  >
-                    {isTablet ? (
+                  {isTablet ? (
+                    // === 태블릿 View (기존 코드 유지) ===
+                    <Form.Item
+                      label="📦 제품선택"
+                      name="jepum_cd"
+                      rules={[{ required: true }]}
+                    >
                       <div>
                         <Input
                           placeholder="제품명 검색..."
@@ -432,22 +424,107 @@ const SegsanRegister = () => {
                           )}
                         </div>
                       </div>
-                    ) : (
-                      <Select
-                        showSearch
-                        placeholder="제품을 선택하세요"
-                        size="large"
-                        optionFilterProp="children"
-                        onChange={handleProductSelectDropdown}
+                    </Form.Item>
+                  ) : (
+                    // === 모바일 View (모달 방식) ===
+                    <>
+                      <Form.Item
+                        label="📦 제품선택"
+                        required
+                        tooltip="여기를 클릭하여 제품을 선택하세요"
                       >
-                        {productList.map((p) => (
-                          <Option key={p.jepum_cd} value={p.jepum_cd}>
-                            {p.jepum_nm} ({p.jepum_cd})
-                          </Option>
-                        ))}
-                      </Select>
-                    )}
-                  </Form.Item>
+                        <Input
+                          readOnly
+                          size="large"
+                          value={selectedProductName}
+                          placeholder="제품을 선택해 주세요"
+                          onClick={() => setIsProductModalOpen(true)} // 클릭 시 모달 오픈
+                          suffix={<SearchOutlined />}
+                        />
+                      </Form.Item>
+
+                      {/* 실제 Form 전송을 위한 숨겨진 필드 */}
+                      <Form.Item
+                        name="jepum_cd"
+                        style={{ display: "none" }}
+                        rules={[
+                          { required: true, message: "제품을 선택해주세요" },
+                        ]}
+                      >
+                        <Input />
+                      </Form.Item>
+
+                      {/* 모바일용 제품 선택 모달 */}
+                      <Modal
+                        title="제품 선택"
+                        open={isProductModalOpen}
+                        onCancel={() => setIsProductModalOpen(false)}
+                        footer={null}
+                        bodyStyle={{ padding: "0" }}
+                        centered
+                        style={{ top: 20 }}
+                      >
+                        <div
+                          style={{
+                            padding: "15px",
+                            borderBottom: "1px solid #f0f0f0",
+                          }}
+                        >
+                          <Input
+                            placeholder="제품명 또는 코드 검색"
+                            prefix={<SearchOutlined />}
+                            size="large"
+                            value={searchTerm}
+                            onChange={handleSearch}
+                          />
+                        </div>
+                        <div style={{ height: "60vh", overflowY: "auto" }}>
+                          {filteredProducts.length > 0 ? (
+                            filteredProducts.map((p) => (
+                              <div
+                                key={p.jepum_cd}
+                                onClick={() => {
+                                  handleProductSelectCard(p); // 기존 선택 핸들러 재사용
+                                  setIsProductModalOpen(false); // 모달 닫기
+                                }}
+                                style={{
+                                  padding: "15px 20px",
+                                  borderBottom: "1px solid #f0f0f0",
+                                  cursor: "pointer",
+                                  backgroundColor:
+                                    selectedProduct === p.jepum_cd
+                                      ? "#e6f7ff"
+                                      : "#fff",
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    fontSize: "15px",
+                                    fontWeight: "bold",
+                                  }}
+                                >
+                                  {p.jepum_nm}
+                                </span>
+                                <span
+                                  style={{ fontSize: "12px", color: "#888" }}
+                                >
+                                  {p.jepum_cd}
+                                </span>
+                              </div>
+                            ))
+                          ) : (
+                            <Empty
+                              description="검색 결과 없음"
+                              style={{ padding: "40px 0" }}
+                            />
+                          )}
+                        </div>
+                      </Modal>
+                    </>
+                  )}
                 </div>
 
                 {isTablet && (
@@ -661,7 +738,6 @@ const SegsanRegister = () => {
                     <span style={{ display: "block", marginBottom: 5 }}>
                       수량 수정:
                     </span>
-                    {/* ✅ [수정] 모달창 수량 입력을 버튼 UI로 변경 */}
                     <div style={{ display: "flex", alignItems: "center" }}>
                       <Button
                         onClick={handleEditMinus}
