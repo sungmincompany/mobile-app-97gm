@@ -9,11 +9,11 @@ import {
   Input,
   Empty,
   Grid,
-  Select,
   Tabs,
   Table,
   Modal,
   Tag,
+  Select, // 드롭다운용 컴포넌트
 } from "antd";
 import dayjs from "dayjs";
 import {
@@ -33,25 +33,26 @@ import { DB_SCHEMA } from "../config";
 const { useBreakpoint } = Grid;
 const { RangePicker } = DatePicker;
 const { TextArea } = Input;
+const { Option } = Select;
 
 const ChulhaRegister = () => {
   // ================= 공통 상태 =================
   const screens = useBreakpoint();
-  const isTablet = !!screens.md;
+  const isTablet = !!screens.md; // md(768px) 이상이면 태블릿/PC
   const v_db = DB_SCHEMA;
   const [activeTab, setActiveTab] = useState("1");
 
   // ================= 탭 1: 등록용 상태 =================
   const [form] = Form.useForm();
 
-  // 1. 제품 관련 상태
+  // 1. 제품 관련 상태 (카드 UI용 필터링 상태 포함)
   const [productList, setProductList] = useState([]);
   const [filteredProducts, setFilteredProducts] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedProductName, setSelectedProductName] = useState("");
   const [productSearchTerm, setProductSearchTerm] = useState("");
 
-  // 2. 거래처(Vender) 관련 상태 [변수명 변경: georae -> vender]
+  // 2. 거래처(Vender) 관련 상태
   const [venderList, setVenderList] = useState([]);
   const [filteredVenders, setFilteredVenders] = useState([]);
   const [selectedVender, setSelectedVender] = useState(null);
@@ -80,17 +81,16 @@ const ChulhaRegister = () => {
       .then((res) => res.json())
       .then((data) => {
         setProductList(data);
-        setFilteredProducts(data);
+        setFilteredProducts(data); // 카드 UI용 초기화
       })
       .catch((err) => console.error("제품 로드 실패:", err));
 
-    // 2. 거래처(Vender) 목록 조회 [API 변경 및 파라미터 추가]
-    // tab_gbn_cd=01 : 매출처만 조회
+    // 2. 거래처(Vender) 목록 조회
     fetch(`/api/common/vender?v_db=${v_db}&tab_gbn_cd=01`)
       .then((res) => res.json())
       .then((data) => {
         setVenderList(data);
-        setFilteredVenders(data);
+        setFilteredVenders(data); // 카드 UI용 초기화
       })
       .catch((err) => console.error("거래처 로드 실패:", err));
   }, [v_db]);
@@ -116,7 +116,7 @@ const ChulhaRegister = () => {
       .catch((err) => message.error("조회 실패"));
   };
 
-  // --- 제품 검색 ---
+  // --- [태블릿용] 제품 검색 및 선택 (카드 UI) ---
   const handleProductSearch = (e) => {
     const keyword = e.target.value;
     setProductSearchTerm(keyword);
@@ -124,7 +124,7 @@ const ChulhaRegister = () => {
     const filtered = productList.filter(
       (p) =>
         p.jepum_nm.toLowerCase().includes(keywordLower) ||
-        p.jepum_cd.toLowerCase().includes(keywordLower)
+        p.jepum_cd.toLowerCase().includes(keywordLower),
     );
     setFilteredProducts(filtered);
   };
@@ -135,7 +135,7 @@ const ChulhaRegister = () => {
     form.setFieldsValue({ jepum_cd: p.jepum_cd });
   };
 
-  // --- 거래처(Vender) 검색 [함수명 및 로직 변경] ---
+  // --- [태블릿용] 거래처 검색 및 선택 (카드 UI) ---
   const handleVenderSearch = (e) => {
     const keyword = e.target.value;
     setVenderSearchTerm(keyword);
@@ -143,7 +143,7 @@ const ChulhaRegister = () => {
     const filtered = venderList.filter(
       (v) =>
         v.vender_nm.toLowerCase().includes(keywordLower) ||
-        v.vender_cd.toLowerCase().includes(keywordLower)
+        v.vender_cd.toLowerCase().includes(keywordLower),
     );
     setFilteredVenders(filtered);
   };
@@ -151,8 +151,19 @@ const ChulhaRegister = () => {
   const handleVenderSelectCard = (v) => {
     setSelectedVender(v.vender_cd);
     setSelectedVenderName(v.vender_nm);
-    // Form 필드명도 vender_cd로 변경
     form.setFieldsValue({ vender_cd: v.vender_cd });
+  };
+
+  // --- [모바일용] 드롭다운 선택 핸들러 ---
+  const handleProductSelectDropdown = (value, option) => {
+    setSelectedProduct(value);
+    setSelectedProductName(option.children); // 드롭다운 텍스트(이름) 저장
+    // Form value는 Select가 자동으로 처리하지만 명시적으로 지정 가능
+  };
+
+  const handleVenderSelectDropdown = (value, option) => {
+    setSelectedVender(value);
+    setSelectedVenderName(option.children);
   };
 
   // --- 수량 조절 ---
@@ -201,7 +212,7 @@ const ChulhaRegister = () => {
       const payload = {
         chulha_dt: values.chulha_dt.format("YYYYMMDD"),
         jepum_cd: values.jepum_cd,
-        vender_cd: values.vender_cd, // [변경] georae_cd -> vender_cd
+        vender_cd: values.vender_cd,
         amt: values.amt,
         bigo: values.bigo || "",
       };
@@ -226,12 +237,9 @@ const ChulhaRegister = () => {
 
   // ================= 탭 2 기능 (삭제/수정) =================
   const handleDelete = (record) => {
-    confirm({
+    Modal.confirm({
       title: "삭제하시겠습니까?",
-      // georae_nm -> vender_nm 으로 화면 표시 변경
-      content: `${record.jepum_nm} / ${record.vender_nm || record.georae_nm} (${
-        record.amt
-      }개)`,
+      content: `${record.jepum_nm} / ${record.vender_nm} (${record.amt}개)`,
       okText: "삭제",
       okType: "danger",
       cancelText: "취소",
@@ -239,7 +247,7 @@ const ChulhaRegister = () => {
         try {
           const res = await fetch(
             `/api/chulha/delete?v_db=${v_db}&chulha_cd=${record.chulha_cd}`,
-            { method: "DELETE" }
+            { method: "DELETE" },
           );
           if (res.ok) {
             message.success("삭제되었습니다.");
@@ -298,8 +306,6 @@ const ChulhaRegister = () => {
     },
     {
       title: "거래처",
-      // 서버에서 가져오는 리스트가 georae_nm인지 vender_nm인지 확인 필요
-      // 보통 백엔드 리스트 조회 쿼리에서도 vender_nm으로 통일하는 것이 좋습니다.
       dataIndex: "vender_nm",
       key: "vender_nm",
       width: 120,
@@ -405,7 +411,10 @@ const ChulhaRegister = () => {
           </span>
         }
         bordered={true}
-        style={{ borderRadius: "10px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}
+        style={{
+          borderRadius: "10px",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+        }}
       >
         <Tabs activeKey={activeTab} onChange={setActiveTab} type="card">
           {/* ================= 탭 1: 출하 등록 ================= */}
@@ -419,7 +428,7 @@ const ChulhaRegister = () => {
               <Form.Item
                 label="📅 출하일자"
                 name="chulha_dt"
-                rules={[{ required: true }]}
+                rules={[{ required: true, message: "날짜를 선택하세요" }]}
                 style={{ marginBottom: "15px" }}
               >
                 <DatePicker
@@ -440,187 +449,258 @@ const ChulhaRegister = () => {
                   📦 제품 및 거래처 선택
                 </div>
 
-                <div style={selectionContainerStyle}>
-                  {/* (좌측) 제품 선택 */}
-                  <div style={productSectionStyle}>
-                    <div
-                      style={{
-                        fontWeight: "bold",
-                        marginBottom: "5px",
-                        textAlign: "center",
-                      }}
+                {/* [중요] 모바일 vs 태블릿 분기 처리
+                  - isTablet (true): 기존의 카드 형태 그리드 UI 표시
+                  - !isTablet (false): 모바일용 드롭다운 UI 표시
+                */}
+                {!isTablet ? (
+                  // === 모바일용 드롭다운 UI ===
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "15px",
+                    }}
+                  >
+                    <Form.Item
+                      label="📦 제품 선택"
+                      name="jepum_cd"
+                      style={{ marginBottom: 0 }}
+                      rules={[{ required: true, message: "제품을 선택하세요" }]}
                     >
-                      제품 목록
-                    </div>
-                    <Input
-                      placeholder="제품 검색..."
-                      prefix={<SearchOutlined />}
-                      value={productSearchTerm}
-                      onChange={handleProductSearch}
-                    />
-                    <Form.Item name="jepum_cd" style={{ display: "none" }}>
-                      <Input />
+                      <Select
+                        showSearch
+                        size="large"
+                        placeholder="제품 검색 및 선택"
+                        optionFilterProp="children"
+                        onChange={handleProductSelectDropdown}
+                        filterOption={(input, option) =>
+                          (option?.children ?? "")
+                            .toLowerCase()
+                            .includes(input.toLowerCase())
+                        }
+                      >
+                        {productList.map((p) => (
+                          <Option key={p.jepum_cd} value={p.jepum_cd}>
+                            {p.jepum_nm}
+                          </Option>
+                        ))}
+                      </Select>
                     </Form.Item>
 
-                    <div style={scrollableListStyle}>
-                      {filteredProducts.length > 0 ? (
-                        <div style={productGridStyle}>
-                          {filteredProducts.map((p) => {
-                            const isSelected = selectedProduct === p.jepum_cd;
-                            return (
-                              <div
-                                key={p.jepum_cd}
-                                onClick={() => handleProductSelectCard(p)}
-                                style={{
-                                  cursor: "pointer",
-                                  border: isSelected
-                                    ? "2px solid #1890ff"
-                                    : "1px solid #f0f0f0",
-                                  backgroundColor: isSelected
-                                    ? "#e6f7ff"
-                                    : "#fafafa",
-                                  borderRadius: "8px",
-                                  padding: "10px",
-                                  textAlign: "center",
-                                  position: "relative",
-                                  transition: "all 0.2s",
-                                  height: "80px",
-                                  display: "flex",
-                                  flexDirection: "column",
-                                  justifyContent: "center",
-                                  alignItems: "center",
-                                }}
-                              >
-                                {isSelected && (
-                                  <CheckCircleFilled
-                                    style={{
-                                      position: "absolute",
-                                      top: "5px",
-                                      right: "5px",
-                                      color: "#1890ff",
-                                      fontSize: "16px",
-                                    }}
-                                  />
-                                )}
-                                <div
-                                  style={{
-                                    fontWeight: "bold",
-                                    fontSize: "14px",
-                                    lineHeight: "1.2",
-                                    wordBreak: "keep-all",
-                                  }}
-                                >
-                                  {p.jepum_nm}
-                                </div>
-                                <div
-                                  style={{
-                                    fontSize: "11px",
-                                    color: "#888",
-                                    marginTop: "4px",
-                                  }}
-                                >
-                                  {p.jepum_cd}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <Empty
-                          description="제품 없음"
-                          image={Empty.PRESENTED_IMAGE_SIMPLE}
-                        />
-                      )}
-                    </div>
+                    <Form.Item
+                      label="🏢 거래처 선택"
+                      name="vender_cd"
+                      style={{ marginBottom: 0 }}
+                      rules={[
+                        { required: true, message: "거래처를 선택하세요" },
+                      ]}
+                    >
+                      <Select
+                        showSearch
+                        size="large"
+                        placeholder="거래처 검색 및 선택"
+                        optionFilterProp="children"
+                        onChange={handleVenderSelectDropdown}
+                        filterOption={(input, option) =>
+                          (option?.children ?? "")
+                            .toLowerCase()
+                            .includes(input.toLowerCase())
+                        }
+                      >
+                        {venderList.map((v) => (
+                          <Option key={v.vender_cd} value={v.vender_cd}>
+                            {v.vender_nm}
+                          </Option>
+                        ))}
+                      </Select>
+                    </Form.Item>
                   </div>
+                ) : (
+                  // === 태블릿/PC용 카드 그리드 UI (기존 유지) ===
+                  <div style={selectionContainerStyle}>
+                    {/* (좌측) 제품 선택 */}
+                    <div style={productSectionStyle}>
+                      <div
+                        style={{
+                          fontWeight: "bold",
+                          marginBottom: "5px",
+                          textAlign: "center",
+                        }}
+                      >
+                        제품 목록
+                      </div>
+                      <Input
+                        placeholder="제품 검색..."
+                        prefix={<SearchOutlined />}
+                        value={productSearchTerm}
+                        onChange={handleProductSearch}
+                      />
+                      <Form.Item name="jepum_cd" style={{ display: "none" }}>
+                        <Input />
+                      </Form.Item>
 
-                  {/* (우측) 거래처(Vender) 선택 */}
-                  <div style={customerSectionStyle}>
-                    <div
-                      style={{
-                        fontWeight: "bold",
-                        marginBottom: "5px",
-                        textAlign: "center",
-                      }}
-                    >
-                      거래처 목록
-                    </div>
-                    <Input
-                      placeholder="거래처 검색..."
-                      prefix={<UserOutlined />}
-                      value={venderSearchTerm}
-                      onChange={handleVenderSearch}
-                    />
-                    {/* [변경] Form Name: vender_cd */}
-                    <Form.Item name="vender_cd" style={{ display: "none" }}>
-                      <Input />
-                    </Form.Item>
-
-                    <div style={scrollableListStyle}>
-                      {filteredVenders.length > 0 ? (
-                        <div style={customerGridStyle}>
-                          {filteredVenders.map((v) => {
-                            // [변경] 데이터 키: vender_cd
-                            const isSelected = selectedVender === v.vender_cd;
-                            return (
-                              <div
-                                key={v.vender_cd}
-                                onClick={() => handleVenderSelectCard(v)}
-                                style={{
-                                  cursor: "pointer",
-                                  border: isSelected
-                                    ? "2px solid #52c41a"
-                                    : "1px solid #f0f0f0",
-                                  backgroundColor: isSelected
-                                    ? "#f6ffed"
-                                    : "#fafafa",
-                                  borderRadius: "6px",
-                                  padding: "10px",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "space-between",
-                                  transition: "all 0.2s",
-                                }}
-                              >
-                                <div>
+                      <div style={scrollableListStyle}>
+                        {filteredProducts.length > 0 ? (
+                          <div style={productGridStyle}>
+                            {filteredProducts.map((p) => {
+                              const isSelected = selectedProduct === p.jepum_cd;
+                              return (
+                                <div
+                                  key={p.jepum_cd}
+                                  onClick={() => handleProductSelectCard(p)}
+                                  style={{
+                                    cursor: "pointer",
+                                    border: isSelected
+                                      ? "2px solid #1890ff"
+                                      : "1px solid #f0f0f0",
+                                    backgroundColor: isSelected
+                                      ? "#e6f7ff"
+                                      : "#fafafa",
+                                    borderRadius: "8px",
+                                    padding: "10px",
+                                    textAlign: "center",
+                                    position: "relative",
+                                    transition: "all 0.2s",
+                                    height: "80px",
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    justifyContent: "center",
+                                    alignItems: "center",
+                                  }}
+                                >
+                                  {isSelected && (
+                                    <CheckCircleFilled
+                                      style={{
+                                        position: "absolute",
+                                        top: "5px",
+                                        right: "5px",
+                                        color: "#1890ff",
+                                        fontSize: "16px",
+                                      }}
+                                    />
+                                  )}
                                   <div
                                     style={{
                                       fontWeight: "bold",
                                       fontSize: "14px",
+                                      lineHeight: "1.2",
+                                      wordBreak: "keep-all",
                                     }}
                                   >
-                                    {v.vender_nm}
+                                    {p.jepum_nm}
                                   </div>
                                   <div
-                                    style={{ fontSize: "11px", color: "#888" }}
+                                    style={{
+                                      fontSize: "11px",
+                                      color: "#888",
+                                      marginTop: "4px",
+                                    }}
                                   >
-                                    {v.vender_cd}
+                                    {p.jepum_cd}
                                   </div>
                                 </div>
-                                {isSelected && (
-                                  <CheckCircleFilled
-                                    style={{
-                                      color: "#52c41a",
-                                      fontSize: "16px",
-                                    }}
-                                  />
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <Empty
-                          description="거래처 없음"
-                          image={Empty.PRESENTED_IMAGE_SIMPLE}
-                        />
-                      )}
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <Empty
+                            description="제품 없음"
+                            image={Empty.PRESENTED_IMAGE_SIMPLE}
+                          />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* (우측) 거래처(Vender) 선택 */}
+                    <div style={customerSectionStyle}>
+                      <div
+                        style={{
+                          fontWeight: "bold",
+                          marginBottom: "5px",
+                          textAlign: "center",
+                        }}
+                      >
+                        거래처 목록
+                      </div>
+                      <Input
+                        placeholder="거래처 검색..."
+                        prefix={<UserOutlined />}
+                        value={venderSearchTerm}
+                        onChange={handleVenderSearch}
+                      />
+                      <Form.Item name="vender_cd" style={{ display: "none" }}>
+                        <Input />
+                      </Form.Item>
+
+                      <div style={scrollableListStyle}>
+                        {filteredVenders.length > 0 ? (
+                          <div style={customerGridStyle}>
+                            {filteredVenders.map((v) => {
+                              const isSelected = selectedVender === v.vender_cd;
+                              return (
+                                <div
+                                  key={v.vender_cd}
+                                  onClick={() => handleVenderSelectCard(v)}
+                                  style={{
+                                    cursor: "pointer",
+                                    border: isSelected
+                                      ? "2px solid #52c41a"
+                                      : "1px solid #f0f0f0",
+                                    backgroundColor: isSelected
+                                      ? "#f6ffed"
+                                      : "#fafafa",
+                                    borderRadius: "6px",
+                                    padding: "10px",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    transition: "all 0.2s",
+                                  }}
+                                >
+                                  <div>
+                                    <div
+                                      style={{
+                                        fontWeight: "bold",
+                                        fontSize: "14px",
+                                      }}
+                                    >
+                                      {v.vender_nm}
+                                    </div>
+                                    <div
+                                      style={{
+                                        fontSize: "11px",
+                                        color: "#888",
+                                      }}
+                                    >
+                                      {v.vender_cd}
+                                    </div>
+                                  </div>
+                                  {isSelected && (
+                                    <CheckCircleFilled
+                                      style={{
+                                        color: "#52c41a",
+                                        fontSize: "16px",
+                                      }}
+                                    />
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <Empty
+                            description="거래처 없음"
+                            image={Empty.PRESENTED_IMAGE_SIMPLE}
+                          />
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
 
-              {/* 선택된 정보 요약 */}
+              {/* 선택된 정보 요약 (태블릿에서만 표시) */}
               {isTablet && (selectedProductName || selectedVenderName) && (
                 <div
                   style={{
@@ -662,7 +742,7 @@ const ChulhaRegister = () => {
                   <Form.Item
                     label="📊 출하수량"
                     name="amt"
-                    rules={[{ required: true }]}
+                    rules={[{ required: true, message: "수량을 입력하세요" }]}
                   >
                     <div style={{ display: "flex", alignItems: "center" }}>
                       <Button
@@ -744,7 +824,7 @@ const ChulhaRegister = () => {
             </Form>
           </Tabs.TabPane>
 
-          {/* ================= 탭 2: 조회 및 수정 ================= */}
+          {/* ================= 탭 2: 조회 및 수정 (변동 없음) ================= */}
           <Tabs.TabPane tab="조회/수정" key="2">
             <div
               style={{
@@ -803,8 +883,7 @@ const ChulhaRegister = () => {
                       <strong>제품:</strong> {editRecord.jepum_nm}
                     </p>
                     <p style={{ margin: 0 }}>
-                      <strong>거래처:</strong>{" "}
-                      {editRecord.vender_nm || editRecord.georae_nm}
+                      <strong>거래처:</strong> {editRecord.vender_nm}
                     </p>
                     <p style={{ margin: 0 }}>
                       <strong>날짜:</strong> {editRecord.chulha_dt}
