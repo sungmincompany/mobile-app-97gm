@@ -27,8 +27,9 @@ import {
   DeleteOutlined,
   UserOutlined,
   ShopOutlined,
-  LeftOutlined, // 👈 추가
-  RightOutlined, // 👈 추가
+  LeftOutlined,
+  RightOutlined,
+  AppstoreOutlined, // ✅ 아이콘 추가
 } from "@ant-design/icons";
 import { DB_SCHEMA } from "../config";
 
@@ -47,15 +48,20 @@ const ChulhaRegister = () => {
   // ================= 탭 1: 등록용 상태 =================
   const [form] = Form.useForm();
 
-  // 1. 제품 관련 상태 (카드 UI용 필터링 상태 포함)
-  const [productList, setProductList] = useState([]);
-  const [filteredProducts, setFilteredProducts] = useState([]);
+  // 1. 제품 관련 상태
+  const [productList, setProductList] = useState([]); // 전체 데이터 (부모+자식)
+  const [filteredProducts, setFilteredProducts] = useState([]); // 화면 표시용 (부모만)
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedProductName, setSelectedProductName] = useState("");
   const [productSearchTerm, setProductSearchTerm] = useState("");
 
   // ✅ [추가] 모바일 제품 선택 모달 상태
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+
+  // ✅ [추가] 하위 제품(분기 제품) 선택 모달 관련 상태
+  const [isSubProductModalOpen, setIsSubProductModalOpen] = useState(false);
+  const [subProducts, setSubProducts] = useState([]);
+  const [parentProductName, setParentProductName] = useState("");
 
   // 2. 거래처(Vender) 관련 상태
   const [venderList, setVenderList] = useState([]);
@@ -86,7 +92,10 @@ const ChulhaRegister = () => {
       .then((res) => res.json())
       .then((data) => {
         setProductList(data);
-        setFilteredProducts(data); // 카드 UI용 초기화
+
+        // ✅ [수정] 초기 화면에는 부모 제품(pum_gbn === '4')만 표시
+        const parents = data.filter((p) => p.pum_gbn === "4");
+        setFilteredProducts(parents);
       })
       .catch((err) => console.error("제품 로드 실패:", err));
 
@@ -95,7 +104,7 @@ const ChulhaRegister = () => {
       .then((res) => res.json())
       .then((data) => {
         setVenderList(data);
-        setFilteredVenders(data); // 카드 UI용 초기화
+        setFilteredVenders(data);
       })
       .catch((err) => console.error("거래처 로드 실패:", err));
   }, [v_db]);
@@ -107,35 +116,22 @@ const ChulhaRegister = () => {
     }
   }, [activeTab, searchRange]);
 
-  // 날짜 하루 전으로 이동
+  // 날짜 관련 핸들러들
   const handlePrevDate = () => {
     const current = form.getFieldValue("chulha_dt");
-    if (current) {
-      form.setFieldsValue({ chulha_dt: current.subtract(1, "day") });
-    }
+    if (current) form.setFieldsValue({ chulha_dt: current.subtract(1, "day") });
   };
 
-  // 날짜 하루 후로 이동
   const handleNextDate = () => {
     const current = form.getFieldValue("chulha_dt");
-    if (current) {
-      form.setFieldsValue({ chulha_dt: current.add(1, "day") });
-    }
+    if (current) form.setFieldsValue({ chulha_dt: current.add(1, "day") });
   };
 
-  // 검색 기간 프리셋 설정 (오늘, 1주일, 1개월)
-  const setRangeToday = () => {
-    setSearchRange([dayjs(), dayjs()]);
-    // 필요 시 바로 조회하려면 fetchHistory() 호출 추가 가능
-  };
-
-  const setRangeWeek = () => {
+  const setRangeToday = () => setSearchRange([dayjs(), dayjs()]);
+  const setRangeWeek = () =>
     setSearchRange([dayjs().subtract(1, "week"), dayjs()]);
-  };
-
-  const setRangeMonth = () => {
+  const setRangeMonth = () =>
     setSearchRange([dayjs().subtract(1, "month"), dayjs()]);
-  };
 
   // ================= 기능 함수들 =================
 
@@ -151,26 +147,54 @@ const ChulhaRegister = () => {
       .catch((err) => message.error("조회 실패"));
   };
 
-  // --- [공통] 제품 검색 및 선택 (모달/카드 공용) ---
+  // --- [수정] 제품 검색 (pum_gbn === '4' 필터 적용) ---
   const handleProductSearch = (e) => {
     const keyword = e.target.value;
     setProductSearchTerm(keyword);
     const keywordLower = keyword.toLowerCase();
+
+    if (!keyword) {
+      setFilteredProducts(productList.filter((p) => p.pum_gbn === "4"));
+      return;
+    }
+
     const filtered = productList.filter(
       (p) =>
-        p.jepum_nm.toLowerCase().includes(keywordLower) ||
-        p.jepum_cd.toLowerCase().includes(keywordLower),
+        p.pum_gbn === "4" &&
+        (p.jepum_nm.toLowerCase().includes(keywordLower) ||
+          p.jepum_cd.toLowerCase().includes(keywordLower)),
     );
     setFilteredProducts(filtered);
   };
 
-  const handleProductSelectCard = (p) => {
-    setSelectedProduct(p.jepum_cd);
-    setSelectedProductName(p.jepum_nm);
-    form.setFieldsValue({ jepum_cd: p.jepum_cd });
+  // ✅ [추가] 제품 클릭 핸들러 (분기 처리 로직)
+  const handleProductClick = (item) => {
+    // sub_cnt가 있으면 자식 제품이 존재함
+    if (item.sub_cnt && item.sub_cnt > 0) {
+      // 전체 목록에서 해당 제품을 부모로 가지는 자식들 찾기
+      const subs = productList.filter((p) => p.root_jepum_cd === item.jepum_cd);
+
+      setSubProducts(subs);
+      setParentProductName(item.jepum_nm);
+      setIsSubProductModalOpen(true); // 하위 제품 선택 모달 열기
+    } else {
+      // 자식 없으면 바로 선택 확정
+      confirmProductSelection(item);
+    }
   };
 
-  // --- [공통] 거래처 검색 및 선택 (모달/카드 공용) ---
+  // ✅ [추가] 제품 선택 확정 함수
+  const confirmProductSelection = (item) => {
+    setSelectedProduct(item.jepum_cd);
+    setSelectedProductName(item.jepum_nm);
+    form.setFieldsValue({ jepum_cd: item.jepum_cd });
+
+    // 모달 닫기
+    setIsProductModalOpen(false);
+    setIsSubProductModalOpen(false);
+  };
+
+  // --- [공통] 거래처 검색 및 선택 ---
   const handleVenderSearch = (e) => {
     const keyword = e.target.value;
     setVenderSearchTerm(keyword);
@@ -216,7 +240,8 @@ const ChulhaRegister = () => {
     setSelectedProduct(null);
     setSelectedProductName("");
     setProductSearchTerm("");
-    setFilteredProducts(productList);
+    // 초기화 시 부모 제품만 다시 보여줌
+    setFilteredProducts(productList.filter((p) => p.pum_gbn === "4"));
 
     setSelectedVender(null);
     setSelectedVenderName("");
@@ -315,7 +340,6 @@ const ChulhaRegister = () => {
     }
   };
 
-  // 조회 테이블 컬럼
   const columns = [
     {
       title: "날짜",
@@ -327,17 +351,8 @@ const ChulhaRegister = () => {
       align: "center",
       sorter: (a, b) => a.chulha_dt.localeCompare(b.chulha_dt),
     },
-    {
-      title: "거래처",
-      dataIndex: "vender_nm",
-      key: "vender_nm",
-      width: 120,
-    },
-    {
-      title: "제품명",
-      dataIndex: "jepum_nm",
-      key: "jepum_nm",
-    },
+    { title: "거래처", dataIndex: "vender_nm", key: "vender_nm", width: 120 },
+    { title: "제품명", dataIndex: "jepum_nm", key: "jepum_nm" },
     {
       title: "수량",
       dataIndex: "amt",
@@ -348,12 +363,7 @@ const ChulhaRegister = () => {
         <span style={{ fontWeight: "bold", color: "#1890ff" }}>{val}</span>
       ),
     },
-    {
-      title: "비고",
-      dataIndex: "bigo",
-      key: "bigo",
-      ellipsis: true,
-    },
+    { title: "비고", dataIndex: "bigo", key: "bigo", ellipsis: true },
     {
       title: "관리",
       key: "action",
@@ -385,7 +395,6 @@ const ChulhaRegister = () => {
     gap: "15px",
     height: isTablet ? "450px" : "auto",
   };
-
   const productSectionStyle = {
     flex: 2,
     display: "flex",
@@ -395,7 +404,6 @@ const ChulhaRegister = () => {
     padding: "10px",
     backgroundColor: "#fff",
   };
-
   const customerSectionStyle = {
     flex: 1,
     display: "flex",
@@ -405,20 +413,17 @@ const ChulhaRegister = () => {
     padding: "10px",
     backgroundColor: "#fff",
   };
-
   const scrollableListStyle = {
     flex: 1,
     overflowY: "auto",
     paddingRight: "5px",
     marginTop: "10px",
   };
-
   const productGridStyle = {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))",
     gap: "10px",
   };
-
   const customerGridStyle = {
     display: "grid",
     gridTemplateColumns: "1fr",
@@ -434,13 +439,9 @@ const ChulhaRegister = () => {
           </span>
         }
         bordered={true}
-        style={{
-          borderRadius: "10px",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-        }}
+        style={{ borderRadius: "10px", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}
       >
         <Tabs activeKey={activeTab} onChange={setActiveTab} type="card">
-          {/* ================= 탭 1: 출하 등록 ================= */}
           <Tabs.TabPane tab="출하 등록" key="1">
             <Form
               form={form}
@@ -448,36 +449,30 @@ const ChulhaRegister = () => {
               onFinish={onFinish}
               initialValues={{ chulha_dt: dayjs(), amt: 1 }}
             >
-              {/* 날짜 선택 영역 수정 */}
               <Form.Item
                 label="📅 출하일자"
                 required
                 style={{ marginBottom: "15px" }}
               >
                 <div style={{ display: "flex", gap: "5px" }}>
-                  {/* 이전 날짜 버튼 */}
                   <Button
                     icon={<LeftOutlined />}
                     onClick={handlePrevDate}
                     size="large"
                   />
-
-                  {/* DatePicker (noStyle로 감싸서 레이아웃 영향 최소화) */}
                   <Form.Item
                     name="chulha_dt"
                     noStyle
                     rules={[{ required: true, message: "날짜를 선택하세요" }]}
                   >
                     <DatePicker
-                      style={{ flex: 1 }} // 남은 공간 꽉 채우기
+                      style={{ flex: 1 }}
                       format="YYYY-MM-DD"
                       size="large"
-                      inputReadOnly={true} // 모바일 키보드 방지
+                      inputReadOnly={true}
                       allowClear={false}
                     />
                   </Form.Item>
-
-                  {/* 다음 날짜 버튼 */}
                   <Button
                     icon={<RightOutlined />}
                     onClick={handleNextDate}
@@ -497,7 +492,6 @@ const ChulhaRegister = () => {
                   📦 제품 및 거래처 선택
                 </div>
 
-                {/* [중요] 모바일 vs 태블릿 분기 처리 */}
                 {!isTablet ? (
                   // === [모바일 View] 모달 방식 ===
                   <div
@@ -507,7 +501,7 @@ const ChulhaRegister = () => {
                       gap: "15px",
                     }}
                   >
-                    {/* 1. 제품 선택 Input (Modal Trigger) */}
+                    {/* 제품 선택 Input */}
                     <Form.Item
                       label="📦 제품 선택"
                       required
@@ -523,7 +517,6 @@ const ChulhaRegister = () => {
                         suffix={<SearchOutlined />}
                       />
                     </Form.Item>
-                    {/* 실제 Form 전송용 히든 필드 */}
                     <Form.Item
                       name="jepum_cd"
                       style={{ display: "none" }}
@@ -534,7 +527,7 @@ const ChulhaRegister = () => {
                       <Input />
                     </Form.Item>
 
-                    {/* 2. 거래처 선택 Input (Modal Trigger) */}
+                    {/* 거래처 선택 Input */}
                     <Form.Item
                       label="🏢 거래처 선택"
                       required
@@ -550,7 +543,6 @@ const ChulhaRegister = () => {
                         suffix={<SearchOutlined />}
                       />
                     </Form.Item>
-                    {/* 실제 Form 전송용 히든 필드 */}
                     <Form.Item
                       name="vender_cd"
                       style={{ display: "none" }}
@@ -578,7 +570,7 @@ const ChulhaRegister = () => {
                         }}
                       >
                         <Input
-                          placeholder="제품명 또는 코드 검색"
+                          placeholder="제품명 검색"
                           prefix={<SearchOutlined />}
                           size="large"
                           value={productSearchTerm}
@@ -590,10 +582,8 @@ const ChulhaRegister = () => {
                           filteredProducts.map((p) => (
                             <div
                               key={p.jepum_cd}
-                              onClick={() => {
-                                handleProductSelectCard(p);
-                                setIsProductModalOpen(false);
-                              }}
+                              // ✅ [수정] 클릭 시 분기 처리 핸들러 호출
+                              onClick={() => handleProductClick(p)}
                               style={{
                                 padding: "15px 20px",
                                 borderBottom: "1px solid #f0f0f0",
@@ -612,9 +602,25 @@ const ChulhaRegister = () => {
                               >
                                 {p.jepum_nm}
                               </span>
-                              <span style={{ fontSize: "12px", color: "#888" }}>
-                                {p.jepum_cd}
-                              </span>
+                              <div style={{ textAlign: "right" }}>
+                                <div
+                                  style={{ fontSize: "12px", color: "#888" }}
+                                >
+                                  {p.jepum_cd}
+                                </div>
+                                {/* ✅ sub_cnt 표시 */}
+                                {p.sub_cnt > 0 && (
+                                  <div
+                                    style={{
+                                      fontSize: "11px",
+                                      color: "#1890ff",
+                                      marginTop: "2px",
+                                    }}
+                                  >
+                                    <AppstoreOutlined /> 하위: {p.sub_cnt}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           ))
                         ) : (
@@ -643,7 +649,7 @@ const ChulhaRegister = () => {
                         }}
                       >
                         <Input
-                          placeholder="거래처명 또는 코드 검색"
+                          placeholder="거래처 검색"
                           prefix={<SearchOutlined />}
                           size="large"
                           value={venderSearchTerm}
@@ -692,7 +698,7 @@ const ChulhaRegister = () => {
                     </Modal>
                   </div>
                 ) : (
-                  // === [태블릿/PC View] 카드 그리드 UI (기존 코드 유지) ===
+                  // === [태블릿/PC View] ===
                   <div style={selectionContainerStyle}>
                     {/* (좌측) 제품 선택 */}
                     <div style={productSectionStyle}>
@@ -714,7 +720,6 @@ const ChulhaRegister = () => {
                       <Form.Item name="jepum_cd" style={{ display: "none" }}>
                         <Input />
                       </Form.Item>
-
                       <div style={scrollableListStyle}>
                         {filteredProducts.length > 0 ? (
                           <div style={productGridStyle}>
@@ -723,7 +728,8 @@ const ChulhaRegister = () => {
                               return (
                                 <div
                                   key={p.jepum_cd}
-                                  onClick={() => handleProductSelectCard(p)}
+                                  // ✅ [수정] 클릭 시 분기 처리 핸들러 호출
+                                  onClick={() => handleProductClick(p)}
                                   style={{
                                     cursor: "pointer",
                                     border: isSelected
@@ -736,8 +742,7 @@ const ChulhaRegister = () => {
                                     padding: "10px",
                                     textAlign: "center",
                                     position: "relative",
-                                    transition: "all 0.2s",
-                                    height: "80px",
+                                    height: "90px", // 높이 살짝 증가
                                     display: "flex",
                                     flexDirection: "column",
                                     justifyContent: "center",
@@ -769,11 +774,24 @@ const ChulhaRegister = () => {
                                     style={{
                                       fontSize: "11px",
                                       color: "#888",
-                                      marginTop: "4px",
+                                      marginTop: "2px",
                                     }}
                                   >
                                     {p.jepum_cd}
                                   </div>
+                                  {/* ✅ sub_cnt 표시 */}
+                                  {p.sub_cnt > 0 && (
+                                    <div
+                                      style={{
+                                        fontSize: "11px",
+                                        color: "#1890ff",
+                                        marginTop: "2px",
+                                        fontWeight: "bold",
+                                      }}
+                                    >
+                                      <AppstoreOutlined /> 하위: {p.sub_cnt}
+                                    </div>
+                                  )}
                                 </div>
                               );
                             })}
@@ -807,7 +825,6 @@ const ChulhaRegister = () => {
                       <Form.Item name="vender_cd" style={{ display: "none" }}>
                         <Input />
                       </Form.Item>
-
                       <div style={scrollableListStyle}>
                         {filteredVenders.length > 0 ? (
                           <div style={customerGridStyle}>
@@ -830,7 +847,6 @@ const ChulhaRegister = () => {
                                     display: "flex",
                                     alignItems: "center",
                                     justifyContent: "space-between",
-                                    transition: "all 0.2s",
                                   }}
                                 >
                                   <div>
@@ -875,7 +891,7 @@ const ChulhaRegister = () => {
                 )}
               </div>
 
-              {/* 선택된 정보 요약 (태블릿에서만 표시) */}
+              {/* 선택 정보 요약 */}
               {isTablet && (selectedProductName || selectedVenderName) && (
                 <div
                   style={{
@@ -963,7 +979,6 @@ const ChulhaRegister = () => {
                 </div>
               </div>
 
-              {/* 하단 버튼 */}
               <div
                 style={{
                   marginTop: "10px",
@@ -1006,7 +1021,7 @@ const ChulhaRegister = () => {
                 marginBottom: 16,
                 display: "flex",
                 justifyContent: "center",
-                alignItems: "center", // 세로 중앙 정렬 추가
+                alignItems: "center",
                 gap: "10px",
                 backgroundColor: "#f9f9f9",
                 padding: "15px",
@@ -1014,14 +1029,12 @@ const ChulhaRegister = () => {
                 flexWrap: "wrap",
               }}
             >
-              {/* 기간 단축 버튼 그룹 추가 */}
               <Button.Group>
-                <Button onClick={setRangeToday}>오늘</Button>
-                <Button onClick={setRangeWeek}>1주일</Button>
-                <Button onClick={setRangeMonth}>1개월</Button>
+                {" "}
+                <Button onClick={setRangeToday}>오늘</Button>{" "}
+                <Button onClick={setRangeWeek}>1주일</Button>{" "}
+                <Button onClick={setRangeMonth}>1개월</Button>{" "}
               </Button.Group>
-
-              {/* 기존 RangePicker */}
               <RangePicker
                 value={searchRange}
                 onChange={(dates) => setSearchRange(dates)}
@@ -1029,8 +1042,6 @@ const ChulhaRegister = () => {
                 format="YYYY-MM-DD"
                 style={{ width: isTablet ? "auto" : "100%" }}
               />
-
-              {/* 기존 조회 버튼 */}
               <Button
                 type="primary"
                 icon={<ReloadOutlined />}
@@ -1039,7 +1050,6 @@ const ChulhaRegister = () => {
                 조회
               </Button>
             </div>
-
             <Table
               dataSource={historyList}
               columns={columns}
@@ -1048,7 +1058,6 @@ const ChulhaRegister = () => {
               scroll={{ x: 500, y: "calc(100vh - 420px)" }}
               size="middle"
             />
-
             <Modal
               title="출하정보 수정"
               open={isModalOpen}
@@ -1075,14 +1084,13 @@ const ChulhaRegister = () => {
                       <strong>날짜:</strong> {editRecord.chulha_dt}
                     </p>
                   </div>
-
                   <div style={{ marginBottom: 15 }}>
                     <span style={{ display: "block", marginBottom: 5 }}>
                       수량 수정:
                     </span>
                     <InputNumber
                       value={editAmt}
-                      onChange={(val) => setEditAmt(val)}
+                      onChange={setEditAmt}
                       min={1}
                       style={{ width: "100%" }}
                       size="large"
@@ -1104,6 +1112,51 @@ const ChulhaRegister = () => {
           </Tabs.TabPane>
         </Tabs>
       </Card>
+
+      {/* ✅ [추가] 하위 제품 선택 모달 (공통) */}
+      <Modal
+        title={
+          <span>
+            <AppstoreOutlined /> {parentProductName} - 상세 선택
+          </span>
+        }
+        open={isSubProductModalOpen}
+        onCancel={() => setIsSubProductModalOpen(false)}
+        footer={null}
+        centered
+        bodyStyle={{ padding: 0 }}
+      >
+        <div style={{ maxHeight: "60vh", overflowY: "auto" }}>
+          {subProducts.map((sub) => (
+            <div
+              key={sub.jepum_cd}
+              onClick={() => confirmProductSelection(sub)}
+              style={{
+                padding: "15px 20px",
+                borderBottom: "1px solid #f0f0f0",
+                cursor: "pointer",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                transition: "background 0.2s",
+              }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.backgroundColor = "#fafafa")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.backgroundColor = "#fff")
+              }
+            >
+              <span style={{ fontSize: "15px", fontWeight: "bold" }}>
+                {sub.jepum_nm}
+              </span>
+              <span style={{ fontSize: "12px", color: "#888" }}>
+                {sub.jepum_cd}
+              </span>
+            </div>
+          ))}
+        </div>
+      </Modal>
     </div>
   );
 };
